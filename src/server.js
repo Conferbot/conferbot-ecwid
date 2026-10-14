@@ -6,6 +6,7 @@ const ecwid = require('./ecwid');
 const ShopStore = require('./store');
 const { extractBotId, isValidBotId, buildPublicConfig } = require('./widgetScript');
 const { renderAdminPage } = require('./adminPage');
+const session = require('./session');
 
 /**
  * App factory - config injected so tests can point OAuth/storage at a mock
@@ -53,7 +54,8 @@ function createApp(cfg) {
         accessToken: token.access_token,
         enabled: existing ? existing.enabled : false,
       });
-      res.redirect(`/app?storeId=${encodeURIComponent(storeId)}`);
+      const pageToken = session.issueToken(storeId, cfg.clientSecret, 10 * 60 * 1000);
+      res.redirect(`/app?storeId=${encodeURIComponent(storeId)}&session=${encodeURIComponent(pageToken)}`);
     } catch (e) {
       res.status(502).send('Installation failed: ' + e.message);
     }
@@ -61,16 +63,25 @@ function createApp(cfg) {
 
   // ---- Settings page ----------------------------------------------------------
 
+  // Only the store's own admin: Ecwid opens the app with an encrypted
+  // payload naming the store, or the install hands over a short-lived token.
+  // The form then carries a token signed with the client secret.
   app.get('/app', (req, res) => {
-    const storeId = String(req.query.storeId || '');
+    const fromEcwid = ecwid.decodeAppPayload(req.query.payload, cfg.clientSecret);
+    const storeId = fromEcwid ? String(fromEcwid.store_id) : String(req.query.storeId || '');
     if (!ecwid.isValidStoreId(storeId)) {
       return res.status(400).send('Missing or invalid storeId');
+    }
+    const allowed = fromEcwid || session.verifyToken(String(req.query.session || ''), storeId, cfg.clientSecret);
+    if (!store.get(storeId) || !allowed) {
+      return res.status(401).send('Open Conferbot from your Ecwid admin (Apps > My Apps).');
     }
     res.send(renderAdminPage({
       storeId,
       record: store.get(storeId),
       demoBotId: cfg.demoBotId,
       saved: req.query.saved === '1',
+      formToken: session.issueToken(storeId, cfg.clientSecret),
     }));
   });
 
@@ -78,6 +89,10 @@ function createApp(cfg) {
     const storeId = String(req.body.storeId || '');
     if (!ecwid.isValidStoreId(storeId)) {
       return res.status(400).send('Missing or invalid storeId');
+    }
+    const formToken = String(req.body.token || '');
+    if (!store.get(storeId) || !session.verifyToken(formToken, storeId, cfg.clientSecret)) {
+      return res.status(401).send('This settings page has expired. Open Conferbot from your Ecwid admin again.');
     }
     const botId = extractBotId(req.body.botId);
     const enabled = req.body.enabled === '1' && isValidBotId(botId);
@@ -99,7 +114,7 @@ function createApp(cfg) {
         return res.status(502).send('Saved locally but Ecwid rejected the config update: ' + e.message);
       }
     }
-    res.redirect(`/app?storeId=${encodeURIComponent(storeId)}&saved=1`);
+    res.redirect(`/app?storeId=${encodeURIComponent(storeId)}&session=${encodeURIComponent(formToken)}&saved=1`);
   });
 
   // Dev/preview helper mirroring what Ecwid public storage would hold.

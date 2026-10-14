@@ -22,8 +22,16 @@ merchant saves settings (/app -> /app/save)
 every storefront page load
   -> Ecwid loads {APP_URL}/storefront/loader.js (registered in the dev portal)
   -> loader reads Ecwid.getAppPublicConfig() and boots
-     window.ConferbotWidget(botId, embedType, { customData: { platform: "ecwid", storeId } })
+     window.ConferbotWidget(botId, embedType, { customData: { platform: "ecwid", storeId }, user? })
+  -> Ecwid.OnOrderPlaced  -> ConferbotWidget.track("purchase", { value, currency?, order_id })  (once per order)
+  -> Ecwid.OnCartChanged  -> ConferbotWidget.track("add_to_cart")                              (when items are added)
 ```
+
+The logged-in customer (from `Ecwid.Customer.get`) is passed as the visitor, unverified: a storefront script cannot hold the identity verification secret. Orders and add-to-cart are reported so Conferbot can credit a sale to the chat that led to it.
+
+The settings page opens only for the store's own admin: from the encrypted `payload` Ecwid adds when it opens the app, or with the short-lived token from the install, and every save carries a token signed with the client secret. A bare `?storeId=` is refused.
+
+Everything visitors see is set per bot in the Conferbot dashboard and delivered at runtime, with nothing to configure in the store: flows and AI agents, live chat with handover to your team (queue position, leave a message when nobody is free, read receipts, file sharing, post-chat rating), the home screen, themes and dark mode, colours, launcher and mascot, greetings, languages and disabled URLs.
 
 The only merchant-facing setting is the **Chatbot ID** (bare ID, full snippet, or URL - auto-extracted), with a one-click **demo bot** (`691c970890527a0468f9b2c9`) that works without a Conferbot account.
 
@@ -58,7 +66,8 @@ RUN_BROWSER_E2E=1 npm test  # + headless Chrome: real CDN widget mounts via load
 ## Production checklist (before App Market submission)
 
 - [ ] Real database behind the store record interface
-- [ ] Native settings iframe (Ecwid payload decryption) so settings open inside the Ecwid control panel
+- [x] Ecwid admin payload decryption (settings open from the Ecwid control panel)
+- [ ] Register the settings page as the app's native iframe in the Ecwid Developer Portal
 - [ ] App Market listing assets (see the submission guide)
 
 ## License

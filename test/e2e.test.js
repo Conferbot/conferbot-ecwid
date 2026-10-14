@@ -9,6 +9,7 @@
 
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
+const crypto = require('node:crypto');
 const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
@@ -104,7 +105,7 @@ test('public config shape is what loader.js expects', () => {
 test('step 1: oauth callback exchanges the code and lands on settings', async () => {
   const res = await fetch(`${appUrl}/auth/callback?code=grant-3`, { redirect: 'manual' });
   assert.strictEqual(res.status, 302);
-  assert.strictEqual(res.headers.get('location'), `/app?storeId=${STORE_ID}`);
+  assert.ok(res.headers.get('location').startsWith(`/app?storeId=${STORE_ID}&session=`));
   assert.strictEqual(mockState.tokenRequests[0].client_id, CLIENT_ID);
   assert.strictEqual(mockState.tokenRequests[0].client_secret, CLIENT_SECRET);
   assert.strictEqual(mockState.tokenRequests[0].code, 'grant-3');
@@ -114,11 +115,42 @@ test('step 1b: callback without code is rejected', async () => {
   assert.strictEqual((await fetch(`${appUrl}/auth/callback`, { redirect: 'manual' })).status, 400);
 });
 
-test('step 2: settings page renders with the demo bot; invalid store ids rejected', async () => {
-  const html = await (await fetch(`${appUrl}/app?storeId=${STORE_ID}`)).text();
+let formToken; // the settings page's signed form token
+
+// The payload Ecwid adds when it opens the app: IV + AES-128-CBC(JSON), base64url.
+function ecwidPayload(obj, secret = CLIENT_SECRET) {
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-128-cbc', Buffer.from(secret.slice(0, 16), 'utf8'), iv);
+  const enc = Buffer.concat([cipher.update(JSON.stringify(obj), 'utf8'), cipher.final()]);
+  return Buffer.concat([iv, enc]).toString('base64url');
+}
+
+test('step 2: settings page opens from the ecwid admin payload; invalid store ids rejected', async () => {
+  const res = await fetch(`${appUrl}/app?payload=${ecwidPayload({ store_id: Number(STORE_ID), access_token: 'x', lang: 'en' })}`);
+  const html = await res.text();
+  assert.strictEqual(res.status, 200);
   assert.ok(html.includes('Paste your Chatbot ID'));
   assert.ok(html.includes(`data-demo-id="${DEMO_ID}"`));
+  formToken = html.match(/name="token" value="([^"]+)"/)[1];
   assert.strictEqual((await fetch(`${appUrl}/app?storeId=../evil`)).status, 400);
+});
+
+test('step 2b: settings refuse anyone but the store admin', async () => {
+  const session = require('../src/session');
+  // A bare ?storeId= (the old hole), a payload made with another secret, another store's token.
+  assert.strictEqual((await fetch(`${appUrl}/app?storeId=${STORE_ID}`)).status, 401);
+  assert.strictEqual((await fetch(`${appUrl}/app?payload=${ecwidPayload({ store_id: Number(STORE_ID) }, 'another-secret-xx')}`)).status, 400);
+  const other = session.issueToken('999', CLIENT_SECRET);
+  assert.strictEqual((await fetch(`${appUrl}/app?storeId=${STORE_ID}&session=${encodeURIComponent(other)}`)).status, 401);
+  const post = (fields) => fetch(`${appUrl}/app/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ storeId: STORE_ID, botId: 'aaaaaaaaaaaaaaaaaaaaaaaa', enabled: '1', ...fields }),
+    redirect: 'manual',
+  });
+  assert.strictEqual((await post({})).status, 401);
+  assert.strictEqual((await post({ token: session.issueToken(STORE_ID, 'wrong-secret') })).status, 401);
+  assert.strictEqual(mockState.publicConfigs[STORE_ID], undefined);
 });
 
 test('step 3: saving pushes the public config to ecwid storage', async () => {
@@ -127,6 +159,7 @@ test('step 3: saving pushes the public config to ecwid storage', async () => {
     botId: `js.onload: window.ConferbotWidget("${DEMO_ID}", "live_chat")`,
     enabled: '1',
     embedType: 'live_chat',
+    token: formToken,
   });
   const res = await fetch(`${appUrl}/app/save`, {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body, redirect: 'manual',

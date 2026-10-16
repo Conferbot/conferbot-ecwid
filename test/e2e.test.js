@@ -34,7 +34,7 @@ before(async () => {
     req.on('data', (c) => { body += c; });
     req.on('end', () => {
       const url = new URL(req.url, 'http://localhost');
-      if (req.method === 'POST' && url.pathname === '/api/oauth/token') {
+      if (req.method === 'POST' && url.pathname === `/api/oauth/token/${STORE_ID}`) {
         mockState.tokenRequests.push(Object.fromEntries(new URLSearchParams(body)));
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({
@@ -103,7 +103,7 @@ test('public config shape is what loader.js expects', () => {
 // ---- the journey -----------------------------------------------------------------
 
 test('step 1: oauth callback exchanges the code and lands on settings', async () => {
-  const res = await fetch(`${appUrl}/auth/callback?code=grant-3`, { redirect: 'manual' });
+  const res = await fetch(`${appUrl}/auth/callback?code=grant-3&store_id=${STORE_ID}`, { redirect: 'manual' });
   assert.strictEqual(res.status, 302);
   assert.ok(res.headers.get('location').startsWith(`/app?storeId=${STORE_ID}&session=`));
   assert.strictEqual(mockState.tokenRequests[0].client_id, CLIENT_ID);
@@ -113,6 +113,12 @@ test('step 1: oauth callback exchanges the code and lands on settings', async ()
 
 test('step 1b: callback without code is rejected', async () => {
   assert.strictEqual((await fetch(`${appUrl}/auth/callback`, { redirect: 'manual' })).status, 400);
+  // Ecwid's current flow always sends store_id; the retired path is not used.
+  assert.strictEqual((await fetch(`${appUrl}/auth/callback?code=x`, { redirect: 'manual' })).status, 400);
+  assert.strictEqual((await fetch(`${appUrl}/auth/callback?code=x&store_id=../1`, { redirect: 'manual' })).status, 400);
+  // The code is exchanged under the installing store's id (the mock knows only 10001).
+  const other = await fetch(`${appUrl}/auth/callback?code=x&store_id=20002`, { redirect: 'manual' });
+  assert.strictEqual(other.status, 502);
 });
 
 let formToken; // the settings page's signed form token

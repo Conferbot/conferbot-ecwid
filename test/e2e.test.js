@@ -166,7 +166,11 @@ test('step 3: saving pushes the public config to ecwid storage', async () => {
   });
   assert.strictEqual(res.status, 302);
 
-  const saved = JSON.parse(mockState.publicConfigs[STORE_ID]);
+  // Ecwid storage takes { value: "<string>" }; the value is the config as JSON text.
+  const entry = JSON.parse(mockState.publicConfigs[STORE_ID]);
+  assert.deepStrictEqual(Object.keys(entry), ['value']);
+  assert.strictEqual(typeof entry.value, 'string');
+  const saved = JSON.parse(entry.value);
   assert.strictEqual(saved.botId, DEMO_ID);
   assert.strictEqual(saved.enabled, true);
   assert.strictEqual(saved.embedType, 'live_chat');
@@ -178,11 +182,32 @@ test('step 4: the storefront loader is served as javascript', async () => {
   assert.match(res.headers.get('content-type'), /javascript/);
   assert.ok(js.includes('getAppPublicConfig'));
   assert.ok(js.includes('conferbot-js'));
+  assert.ok(js.includes(`var APP_ID = "${CLIENT_ID}";`));
+});
+
+test('step 4b: the loader boots from the public config however Ecwid returns it', async () => {
+  const js = await (await fetch(`${appUrl}/storefront/loader.js`)).text();
+  const value = JSON.parse(mockState.publicConfigs[STORE_ID]).value;
+  for (const returned of [value, JSON.stringify({ key: 'public', value }), { key: 'public', value }]) {
+    const calls = [];
+    const added = [];
+    const doc = {
+      getElementById: () => null,
+      createElement: () => ({}),
+      head: { appendChild: (el) => added.push(el) },
+    };
+    const Ecwid = { getAppPublicConfig: (id) => { calls.push(id); return returned; } };
+    new Function('window', 'document', js)({ Ecwid }, doc);
+    assert.deepStrictEqual(calls, [CLIENT_ID]);
+    assert.strictEqual(added.length, 1);
+    assert.strictEqual(added[0].src, 'https://cdn.conferbot.com/dist/v1/widget.min.js');
+    assert.strictEqual(added[0].id, 'conferbot-js');
+  }
 });
 
 test('step 5: real browser - widget mounts on an ecwid-like storefront', { skip: process.env.RUN_BROWSER_E2E !== '1' }, async () => {
   const puppeteer = require('puppeteer');
-  const publicConfig = mockState.publicConfigs[STORE_ID];
+  const publicConfig = JSON.parse(mockState.publicConfigs[STORE_ID]).value;
 
   const site = http.createServer((req, res) => {
     res.setHeader('Content-Type', 'text/html');

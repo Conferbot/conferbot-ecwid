@@ -8,6 +8,8 @@
  */
 (function () {
   var BOT_ID_RE = /^[a-f0-9]{24}$/i;
+  // The app's Ecwid client_id: the server fills it in when it serves this file.
+  var APP_ID = 'conferbot-live-chat';
 
   function track(name, props, once) {
     if (!window.ConferbotWidget || typeof window.ConferbotWidget.track !== 'function') return;
@@ -89,10 +91,16 @@
     (document.head || document.documentElement).appendChild(js);
   }
 
+  // The public storage value: the JSON text the settings page saved, or
+  // (as some Ecwid builds return it) the whole { key, value } entry.
   function readConfig() {
     try {
-      var raw = window.Ecwid.getAppPublicConfig('conferbot-live-chat');
-      return raw ? JSON.parse(raw) : null;
+      var raw = window.Ecwid.getAppPublicConfig(APP_ID);
+      var parsed = typeof raw === 'string' ? (raw ? JSON.parse(raw) : null) : raw;
+      if (parsed && typeof parsed.value === 'string' && parsed.botId === undefined) {
+        parsed = parsed.value ? JSON.parse(parsed.value) : null;
+      }
+      return parsed && typeof parsed === 'object' ? parsed : null;
     } catch (e) {
       return null;
     }

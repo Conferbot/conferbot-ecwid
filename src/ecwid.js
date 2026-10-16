@@ -38,7 +38,8 @@ async function exchangeCodeForToken({ code, redirectUri, cfg }) {
 
 /**
  * Writes the app's PUBLIC storage key. Ecwid exposes it to the storefront
- * via Ecwid.getAppPublicConfig(appId), which our loader.js reads.
+ * via Ecwid.getAppPublicConfig(clientId), which our loader.js reads.
+ * Ecwid's storage takes { "value": "<string>" }, so the config travels as JSON text.
  */
 async function savePublicConfig({ storeId, accessToken, config, cfg }) {
   const res = await fetch(`${cfg.apiBase}/api/v3/${storeId}/storage/public`, {
@@ -47,7 +48,7 @@ async function savePublicConfig({ storeId, accessToken, config, cfg }) {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(config),
+    body: JSON.stringify({ value: JSON.stringify(config) }),
   });
   if (!res.ok) {
     throw new Error(`public config save failed: HTTP ${res.status}`);

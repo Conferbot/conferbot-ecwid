@@ -13,7 +13,15 @@ function isValidStoreId(id) {
   return STORE_ID_RE.test(String(id || ''));
 }
 
-async function exchangeCodeForToken({ code, redirectUri, cfg }) {
+/**
+ * Exchanges the install code for the store's access token. Since Ecwid's
+ * September 2025 change the redirect carries ?code=&store_id= and the code
+ * is exchanged at POST /api/oauth/token/{store_id}.
+ */
+async function exchangeCodeForToken({ code, storeId, redirectUri, cfg }) {
+  if (!isValidStoreId(storeId)) {
+    throw new Error('missing or invalid store_id');
+  }
   const body = new URLSearchParams({
     client_id: cfg.clientId,
     client_secret: cfg.clientSecret,
@@ -21,7 +29,7 @@ async function exchangeCodeForToken({ code, redirectUri, cfg }) {
     redirect_uri: redirectUri,
     grant_type: 'authorization_code',
   });
-  const res = await fetch(`${cfg.oauthBase}/api/oauth/token`, {
+  const res = await fetch(`${cfg.oauthBase}/api/oauth/token/${encodeURIComponent(storeId)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
@@ -32,6 +40,9 @@ async function exchangeCodeForToken({ code, redirectUri, cfg }) {
   const data = await res.json();
   if (!data.access_token || !data.store_id) {
     throw new Error('token exchange returned no access_token/store_id');
+  }
+  if (String(data.store_id) !== String(storeId)) {
+    throw new Error('token exchange returned another store');
   }
   return data;
 }

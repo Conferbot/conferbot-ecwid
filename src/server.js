@@ -123,6 +123,27 @@ function createApp(cfg) {
     res.redirect(`/app?storeId=${encodeURIComponent(storeId)}&session=${encodeURIComponent(formToken)}&saved=1`);
   });
 
+  // ---- Webhooks (Ecwid -> us; the app's webhookUrl) ----------------------------
+  // Signed with the client secret. On uninstall (or the owner's request to
+  // remove their data) the store's token and settings are deleted.
+  app.post('/webhooks', express.json({ limit: '64kb' }), (req, res) => {
+    const event = req.body || {};
+    const ok = ecwid.verifyWebhookSignature({
+      eventCreated: event.eventCreated,
+      eventId: event.eventId,
+      signature: req.get('X-Ecwid-Webhook-Signature'),
+    }, cfg.clientSecret);
+    if (!ok) {
+      return res.status(401).send('Invalid signature');
+    }
+    const storeId = String(event.storeId || '');
+    if (ecwid.isValidStoreId(storeId)
+      && (event.eventType === 'application.uninstalled' || event.eventType === 'profile.personalDataRemovalRequest')) {
+      store.remove(storeId);
+    }
+    res.status(200).json({ ok: true });
+  });
+
   // Dev/preview helper mirroring what Ecwid public storage would hold.
   app.get('/preview/public-config.json', (req, res) => {
     const storeId = String(req.query.storeId || '');

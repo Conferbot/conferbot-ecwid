@@ -87,4 +87,18 @@ function decodeAppPayload(payload, clientSecret) {
   }
 }
 
-module.exports = { isValidStoreId, exchangeCodeForToken, savePublicConfig, decodeAppPayload };
+/**
+ * Ecwid webhook signature: X-Ecwid-Webhook-Signature is
+ * base64(HMAC-SHA256("{eventCreated}.{eventId}", client secret)).
+ */
+function verifyWebhookSignature({ eventCreated, eventId, signature }, clientSecret) {
+  if (!clientSecret || !signature || eventCreated === undefined || eventId === undefined) return false;
+  const want = Buffer.from(
+    crypto.createHmac('sha256', clientSecret).update(`${eventCreated}.${eventId}`).digest('base64'),
+    'utf8'
+  );
+  const got = Buffer.from(String(signature), 'utf8');
+  return want.length === got.length && crypto.timingSafeEqual(want, got);
+}
+
+module.exports = { isValidStoreId, exchangeCodeForToken, savePublicConfig, decodeAppPayload, verifyWebhookSignature };

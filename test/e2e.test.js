@@ -211,6 +211,33 @@ test('step 4b: the loader boots from the public config however Ecwid returns it'
   }
 });
 
+function signedWebhook(event, secret = CLIENT_SECRET) {
+  const signature = crypto.createHmac('sha256', secret).update(`${event.eventCreated}.${event.eventId}`).digest('base64');
+  return fetch(`${appUrl}/webhooks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Ecwid-Webhook-Signature': signature },
+    body: JSON.stringify(event),
+  });
+}
+
+test('step 6: uninstall webhook is verified and removes the store', async () => {
+  const event = { eventId: 'e-1', eventCreated: 1760000000, storeId: Number(STORE_ID), entityId: Number(STORE_ID), eventType: 'application.uninstalled', data: {} };
+  // Unsigned and forged calls are refused and change nothing.
+  const unsigned = await fetch(`${appUrl}/webhooks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(event) });
+  assert.strictEqual(unsigned.status, 401);
+  assert.strictEqual((await signedWebhook(event, 'another-secret')).status, 401);
+  assert.strictEqual((await fetch(`${appUrl}/preview/public-config.json?storeId=${STORE_ID}`).then((r) => r.json())).botId, DEMO_ID);
+
+  // Other events are acknowledged and ignored.
+  assert.strictEqual((await signedWebhook({ ...event, eventId: 'e-0', eventType: 'order.created' })).status, 200);
+  assert.strictEqual((await fetch(`${appUrl}/preview/public-config.json?storeId=${STORE_ID}`).then((r) => r.json())).botId, DEMO_ID);
+
+  assert.strictEqual((await signedWebhook(event)).status, 200);
+  assert.deepStrictEqual(await fetch(`${appUrl}/preview/public-config.json?storeId=${STORE_ID}`).then((r) => r.json()), {});
+  const page = await fetch(`${appUrl}/app?payload=${ecwidPayload({ store_id: Number(STORE_ID) })}`);
+  assert.strictEqual(page.status, 401);
+});
+
 test('step 5: real browser - widget mounts on an ecwid-like storefront', { skip: process.env.RUN_BROWSER_E2E !== '1' }, async () => {
   const puppeteer = require('puppeteer');
   const publicConfig = JSON.parse(mockState.publicConfigs[STORE_ID]).value;

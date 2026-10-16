@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const ecwid = require('./ecwid');
@@ -28,11 +29,14 @@ function createApp(cfg) {
 
   app.get('/logo.png', (req, res) => res.sendFile(path.join(__dirname, '..', 'logo.png')));
 
-  // The storefront loader registered in the Ecwid Developer Portal.
+  // The storefront loader registered in the Ecwid Developer Portal, with
+  // this app's client_id filled in (Ecwid.getAppPublicConfig needs it).
+  const loaderSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'loader.js'), 'utf8')
+    .replace("var APP_ID = 'conferbot-live-chat';", `var APP_ID = ${JSON.stringify(String(cfg.clientId || 'conferbot-live-chat')).replace(/</g, '\\u003c')};`);
   app.get('/storefront/loader.js', (req, res) => {
     res.type('application/javascript');
     res.set('Cache-Control', 'public, max-age=3600');
-    res.sendFile(path.join(__dirname, '..', 'public', 'loader.js'));
+    res.send(loaderSource);
   });
 
   // ---- OAuth callback (Ecwid -> us after marketplace install) ---------------

@@ -14,7 +14,7 @@ const session = require('./session');
  * Ecwid. Returns { app, store }.
  *
  * Ecwid flow: install from the App Market -> Ecwid redirects to
- * {appUrl}/auth/callback?code= -> token exchange returns access_token +
+ * {appUrl}/auth/callback?code=&store_id= -> token exchange returns access_token +
  * store_id -> merchant configures in /app -> every save writes the app's
  * PUBLIC storage, which public/loader.js reads on the storefront via
  * Ecwid.getAppPublicConfig().
@@ -44,11 +44,13 @@ function createApp(cfg) {
   app.get('/auth/callback', async (req, res) => {
     try {
       const { code } = req.query;
-      if (!code) {
-        return res.status(400).send('Missing code');
+      const installStoreId = String(req.query.store_id || '');
+      if (!code || !ecwid.isValidStoreId(installStoreId)) {
+        return res.status(400).send('Missing code or store_id');
       }
       const token = await ecwid.exchangeCodeForToken({
         code,
+        storeId: installStoreId,
         redirectUri: `${cfg.appUrl}/auth/callback`,
         cfg,
       });

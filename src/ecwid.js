@@ -101,4 +101,13 @@ function verifyWebhookSignature({ eventCreated, eventId, signature }, clientSecr
   return want.length === got.length && crypto.timingSafeEqual(want, got);
 }
 
-module.exports = { isValidStoreId, exchangeCodeForToken, savePublicConfig, decodeAppPayload, verifyWebhookSignature };
+/**
+ * The required scopes the token response did not grant. Ecwid returns the
+ * granted scopes as one space-separated string.
+ */
+function missingScopes(granted, required) {
+  const have = new Set(String(granted || '').split(/[\s,]+/).filter(Boolean));
+  return (required || []).filter((s) => !have.has(s));
+}
+
+module.exports = { isValidStoreId, missingScopes, exchangeCodeForToken, savePublicConfig, decodeAppPayload, verifyWebhookSignature };

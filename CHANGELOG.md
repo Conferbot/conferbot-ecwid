@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Scopes: the app now declares `read_store_profile update_store_profile customize_storefront add_to_cp` (`src/config.js`). Ecwid loads the storefront loader only with `customize_storefront`, and the native settings page needs `add_to_cp`. The install callback warns when the granted token is missing any of them (#9).
+
 ## 0.1.0 - 2026-10-17
 
 First tagged version of the Conferbot Ecwid app (Express, OAuth). Not yet listed on the Ecwid App Market.

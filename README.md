@@ -116,7 +116,7 @@ test/e2e.test.js       # journey against mock Ecwid + browser widget mount
 
 1. Register the app with Ecwid ([Developer Portal](https://my.ecwid.com/#develop-apps)) and ask Ecwid for these app settings:
    - `redirectUrl`: `{APP_URL}/auth/callback` (Ecwid now sends `code` and `store_id`; the code is exchanged at `/api/oauth/token/{store_id}`)
-   - scopes: `read_store_profile update_store_profile` (writing the public storage needs `update_store_profile`)
+   - scopes: `read_store_profile update_store_profile customize_storefront add_to_cp` (`src/config.js`). Writing the public storage needs `update_store_profile`; Ecwid only loads the storefront JS (`customJsUrl`) with `customize_storefront`, and the native settings page (`iframeUrl`) needs `add_to_cp`. Scopes are set on the app, and changing them later makes every store reinstall, so ask for all four up front. The install callback logs a warning when a token comes back without one of them.
    - native app page (`iframeUrl`): `{APP_URL}/app`
    - storefront JS (custom JS URL): `{APP_URL}/storefront/loader.js`
    - `webhookUrl`: `{APP_URL}/webhooks`, events `application.uninstalled` and `profile.personalDataRemovalRequest`

@@ -55,6 +55,12 @@ function createApp(cfg) {
         cfg,
       });
       const storeId = String(token.store_id);
+      const missing = ecwid.missingScopes(token.scope, cfg.scopes);
+      if (missing.length) {
+        // Without customize_storefront Ecwid never loads the storefront
+        // loader, so the chat would silently not appear. Ask Ecwid to add it.
+        console.warn(`[conferbot] store ${storeId}: token lacks scopes ${missing.join(' ')}`);
+      }
       const existing = store.get(storeId);
       store.upsert(storeId, {
         accessToken: token.access_token,

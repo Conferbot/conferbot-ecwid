@@ -16,7 +16,7 @@ Everything needed to get the Conferbot Ecwid app (0.1.0) into the Ecwid App Mark
 
 | Requirement | Status |
 | --- | --- |
-| Storefront JS through `customJsUrl`, which needs the **`customize_storefront`** scope | **Fix, #9.** The README lists only `read_store_profile update_store_profile`. Ask Ecwid for `read_store_profile update_store_profile customize_storefront add_to_cp` when they create the app. A scope change later forces every store to reinstall. |
+| Storefront JS through `customJsUrl`, which needs the **`customize_storefront`** scope | OK in code (#9, fixed). `src/config.js` and the README declare `read_store_profile update_store_profile customize_storefront add_to_cp`. **Ask Ecwid for exactly these four when they create the app**: a scope change later forces every store to reinstall. |
 | Settings page inside the Ecwid admin (`add_to_cp` plus `iframeUrl`), with the payload decrypted with the client secret | Code OK (AES payload decryption). The **native page must be registered** by Ecwid (`iframeUrl` = `{APP_URL}/app`), as the README checklist notes. |
 | Store ID included in external app authentication (since Sept 2025) | OK. The OAuth callback uses `store_id` in the token exchange URL. |
 | Uninstall and personal-data-removal webhooks | OK. `application.uninstalled` and `profile.personalDataRemovalRequest` are both handled, with the signature checked. |
@@ -27,9 +27,8 @@ Everything needed to get the Conferbot Ecwid app (0.1.0) into the Ecwid App Mark
 ## 3. Blockers
 
 1. **Idea approval** by Ecwid, then onboarding. This is the gate.
-2. **#9**: the scope list (`customize_storefront`, `add_to_cp`).
-3. **Hosting**: a public HTTPS `APP_URL`, a database, and `ECWID_CLIENT_ID` / secret from the app Ecwid creates.
-4. **Company entity** details, because this is an AI app.
+2. **Hosting**: a public HTTPS `APP_URL`, a database, and `ECWID_CLIENT_ID` / secret from the app Ecwid creates.
+3. **Company entity** details, because this is an AI app.
 
 ## 4. Listing copy (ready to paste into the idea and readiness forms)
 
@@ -90,7 +89,8 @@ Ecwid publishes no image specs; they arrive with the readiness form.
 
 - [ ] Submit the app idea (form above) with the idea description. Wait 1–2 business days.
 - [ ] Provide company entity details (AI app rule) and accept the partner contract.
-- [ ] Fix #9. Host the app (HTTPS `APP_URL`, a database) and give Ecwid the `iframeUrl`, `customJsUrl`, `webhookUrl` and redirect URL.
+- [x] Fix #9 (scopes declared in code and README).
+- [ ] Ask Ecwid for the scopes `read_store_profile update_store_profile customize_storefront add_to_cp`. Host the app (HTTPS `APP_URL`, a database) and give Ecwid the `iframeUrl`, `customJsUrl`, `webhookUrl` and redirect URL.
 - [ ] Fill in the App Readiness Form with the copy and assets above, plus screenshots from the test store.
 - [ ] Record the validation screencast and pass validation.
 

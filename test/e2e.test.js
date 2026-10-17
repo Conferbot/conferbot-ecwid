@@ -17,6 +17,8 @@ const fs = require('node:fs');
 
 const createApp = require('../src/server');
 const { extractBotId, isValidBotId, buildPublicConfig } = require('../src/widgetScript');
+const { missingScopes } = require('../src/ecwid');
+const appConfig = require('../src/config');
 
 const STORE_ID = '10001';
 const CLIENT_ID = 'test-ecwid-client';
@@ -39,7 +41,7 @@ before(async () => {
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({
           access_token: 'ecwid-mock-token', token_type: 'Bearer',
-          scope: 'read_store_profile update_store_profile', store_id: Number(STORE_ID),
+          scope: 'read_store_profile update_store_profile customize_storefront add_to_cp', store_id: Number(STORE_ID),
         }));
       }
       const m = url.pathname.match(/^\/api\/v3\/(\d+)\/storage\/public$/);
@@ -68,6 +70,7 @@ before(async () => {
     apiBase: `http://localhost:${mockEcwid.address().port}`,
     widgetScriptUrl: 'https://cdn.conferbot.com/dist/v1/widget.min.js',
     demoBotId: DEMO_ID,
+    scopes: appConfig.scopes,
     dataFile,
   };
   const { app } = createApp(cfg);
@@ -98,6 +101,17 @@ test('public config shape is what loader.js expects', () => {
   assert.deepStrictEqual(config, {
     botId: DEMO_ID, embedType: 'live_chat', enabled: true, scriptUrl: 'https://cdn.x/w.js',
   });
+});
+
+test('the app requests the storefront and admin-page scopes', () => {
+  // customJsUrl (public/loader.js) only loads with customize_storefront;
+  // the native settings page needs add_to_cp; public storage needs update_store_profile.
+  for (const s of ['customize_storefront', 'add_to_cp', 'update_store_profile']) {
+    assert.ok(appConfig.scopes.includes(s), s);
+  }
+  assert.deepStrictEqual(missingScopes('read_store_profile update_store_profile customize_storefront add_to_cp', appConfig.scopes), []);
+  assert.deepStrictEqual(missingScopes('read_store_profile update_store_profile', appConfig.scopes), ['customize_storefront', 'add_to_cp']);
+  assert.deepStrictEqual(missingScopes(undefined, ['add_to_cp']), ['add_to_cp']);
 });
 
 // ---- the journey -----------------------------------------------------------------

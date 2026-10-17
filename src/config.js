@@ -13,5 +13,12 @@ module.exports = {
   apiBase: process.env.ECWID_API_BASE || 'https://app.ecwid.com',
   widgetScriptUrl: process.env.CONFERBOT_WIDGET_URL || 'https://cdn.conferbot.com/dist/v1/widget.min.js',
   demoBotId: '691c970890527a0468f9b2c9',
+  // Access scopes to request from Ecwid for the app. Ecwid sets them on the
+  // app, not per install, and a later change forces every store to reinstall.
+  //   read_store_profile / update_store_profile: write the public app storage
+  //   customize_storefront: Ecwid loads the customJsUrl (public/loader.js) and
+  //     its Ecwid JS API calls (getAppPublicConfig, Customer.get, OnOrderPlaced)
+  //   add_to_cp: the native settings page (iframeUrl = {APP_URL}/app)
+  scopes: ['read_store_profile', 'update_store_profile', 'customize_storefront', 'add_to_cp'],
   dataFile: process.env.DATA_FILE || require('path').join(__dirname, '..', 'data', 'stores.json'),
 };
